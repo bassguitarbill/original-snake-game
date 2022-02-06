@@ -134,8 +134,10 @@ void draw_walls() {
   SDL_RenderFillRect(game.renderer, &block);
 }
 
+#define SNAKE_SIZE sizeof(game.snake)/sizeof(game.snake[0])
+
 void spawn_snake(int start_x, int start_y) {
-  for (int i = 0; i < sizeof(game.snake)/sizeof(game.snake[0]); i++) {
+  for (int i = 0; i < SNAKE_SIZE; i++) {
     game.snake[i].x = 0;
     game.snake[i].y = 0;
     game.snake[i].w = 0;
@@ -154,7 +156,7 @@ void spawn_snake(int start_x, int start_y) {
 }
 
 void handle_collisions() {
-  for (int i = 1; i < sizeof(game.snake)/sizeof(game.snake[0]); i++) {
+  for (int i = 1; i < SNAKE_SIZE; i++) {
     if (game.snake[i].w == 0) {
       break;
     }
@@ -218,7 +220,7 @@ void move_snake() {
     return;
   }
 
-  for (int i = sizeof(game.snake)/sizeof(game.snake[0])-1; i >= 0; i--) {
+  for (int i = SNAKE_SIZE-1; i >= 0; i--) {
     game.snake[i] = game.snake[i-1];
   }
 
@@ -232,7 +234,7 @@ void move_snake() {
     game.score += 1;
     display_score();
   } else {
-    for (int i = 5; i < sizeof(game.snake)/sizeof(game.snake[0]); i++) {
+    for (int i = 5; i < SNAKE_SIZE; i++) {
       if (game.snake[i].w == 0) {
         game.snake[i-1].x = 0;
         game.snake[i-1].y = 0;
@@ -251,7 +253,7 @@ void draw_snake(void) {
   SDL_SetRenderDrawColor(game.renderer, game.game_over ? DEAD_SNAKE_COLOR : SNAKE_COLOR);
   SDL_RenderFillRect(game.renderer, &game.snake[0]);
 
-  for (int i = 1; i < sizeof(game.snake)/sizeof(game.snake[0]); i++) {
+  for (int i = 1; i < SNAKE_SIZE; i++) {
     if (game.snake[i].w == 0) {
       break;
     }
@@ -284,7 +286,7 @@ void spawn_food() {
   }
 
   // printf("%d vs %d, %d vs %d\n", game.snake[4].x, game.food.x, game.snake[4].y, game.food.y);
-  for (int i = 0; i < sizeof(game.snake)/sizeof(game.snake[0]); i++) {
+  for (int i = 0; i < SNAKE_SIZE; i++) {
     if (game.snake[i].w == 0) {
       break;
     }

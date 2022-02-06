@@ -320,7 +320,7 @@ void handle_collisions() {
     return;
   }
 
-  if (game.snake[0].x > SCREEN_WIDTH - WALL_THICKNESS) {
+  if (game.snake[0].x >= SCREEN_WIDTH - WALL_THICKNESS) {
     game.game_over = 1;
     return;
   }
@@ -330,7 +330,7 @@ void handle_collisions() {
     return;
   }
   
-  if (game.snake[0].y > SCREEN_HEIGHT - WALL_THICKNESS) {
+  if (game.snake[0].y >= SCREEN_HEIGHT - WALL_THICKNESS) {
     game.game_over = 1;
     return;
   }

@@ -14,11 +14,16 @@
 #define SNAKE_START_X 200
 #define SNAKE_START_Y 200
 
+#define NUM_TEXTURES 3
+
 void initialize(void);
 void terminate(int exit_code);
 void handle_input(void);
 void draw_walls(void);
 void draw_snake(void);
+void draw_title_screen(void);
+void draw_paused(void);
+void draw_game_over(void);
 void spawn_snake(int start_x, int start_y);
 void move_snake(void);
 void change_direction(SDL_KeyCode new_direction);
@@ -29,37 +34,63 @@ void spawn_food(void);
 void draw_food(void);
 
 void display_score(void);
+void check_game_over(void);
+
+void start_game(void);
+void pause_game(void);
+void unpause_game(void);
+void to_title_screen(void);
+
+SDL_Texture* get_texture(char* name);
+char* path_for_image(char* name);
 
 typedef enum dir {UP, DOWN, LEFT, RIGHT} dir;
+
+typedef enum gamestate {TITLE_SCREEN, PLAYING, PAUSED, GAME_OVER} game_state;
+
+typedef struct {
+  char* name;
+  SDL_Texture *texture;
+} Tex;
 
 typedef struct {
   SDL_Renderer *renderer;
   SDL_Window *window;
   int running;
-  SDL_Rect snake[CELL_COUNT];
+  SDL_Rect *snake;
   int dx;
   int dy;
   dir last_move;
   int game_over;
   SDL_Rect food;
   int score;
+  game_state state;
+  Tex *textures;
 } Game;
 
-Game game = {
-  .running = 1,
-  .snake = {0},
-  .dx = CELL_WIDTH,
-  .dy = 0,
-  .game_over = 0,
-  .food = {
-    .w = CELL_WIDTH,
-    .h = CELL_HEIGHT
-  },
-  .last_move = RIGHT,
-  .score = 0,
-};
+void initialize_game_object(void);
+
+Game game;
+
+void initialize_game_object() {
+  if (game.snake) {
+    game.snake = realloc(game.snake, sizeof(SDL_Rect) * CELL_COUNT);
+  } else {
+    game.snake = malloc(sizeof(SDL_Rect) * CELL_COUNT);
+  }
+  game.running = 1;
+  game.dx = CELL_WIDTH;
+  game.dy = 0;
+  game.game_over = 0;
+  game.food.w = CELL_WIDTH;
+  game.food.h = CELL_HEIGHT;
+  game.last_move = RIGHT;
+  game.score = 0;
+  game.state = TITLE_SCREEN;
+}
 
 int main() {
+  initialize_game_object();
   initialize();
 
   spawn_snake(SNAKE_START_X, SNAKE_START_Y);
@@ -71,17 +102,60 @@ int main() {
 
     handle_input();
 
-    move_snake();
-    draw_food();
-    draw_snake();
-    draw_walls();
-
+    switch (game.state) {
+      case TITLE_SCREEN:
+        draw_walls();
+        draw_title_screen();
+        break;
+      case PLAYING:
+        move_snake();
+        draw_walls();
+        draw_food();
+        draw_snake();
+        check_game_over();
+        break;
+      case PAUSED:
+        draw_walls();
+        draw_food();
+        draw_snake();
+        draw_paused();
+        break;
+      case GAME_OVER:
+        draw_walls();
+        draw_food();
+        draw_snake();
+        draw_game_over();
+        break;
+    }
     SDL_RenderPresent(game.renderer);
 
     SDL_Delay(100);
   }
 
   terminate(EXIT_SUCCESS);
+}
+
+void start_game() {
+  game.state = PLAYING;
+  return;
+}
+
+void pause_game() {
+  game.state = PAUSED;
+  return;
+}
+
+void unpause_game() {
+  game.state = PLAYING;
+  return;
+}
+
+void to_title_screen() {
+  initialize_game_object();
+  display_score();
+  spawn_snake(SNAKE_START_X, SNAKE_START_Y);
+  game.state = TITLE_SCREEN;
+  return;
 }
 
 void initialize() {
@@ -111,6 +185,75 @@ void initialize() {
     printf("error: failed to create renderer: %s\n", SDL_GetError());
     terminate(EXIT_FAILURE);
   }
+
+  game.textures = malloc(NUM_TEXTURES * sizeof(Tex));
+  char* tex_names[] = {"title", "pause", "game_over"};
+
+  SDL_Surface *image;
+  SDL_Texture *texture;
+
+  for (int i = 0; i < NUM_TEXTURES; i ++) {
+    image = SDL_LoadBMP(path_for_image(tex_names[i]));
+    if (!image) {
+      printf("error: failed to load image '%s': %s\n", tex_names[i], SDL_GetError());
+      terminate(EXIT_FAILURE);
+    }
+    texture = SDL_CreateTextureFromSurface(game.renderer, image);
+    if (!texture) {
+      printf("error: failed to create title screen texture: %s\n", SDL_GetError());
+      terminate(EXIT_FAILURE);
+    }
+    SDL_FreeSurface(image);
+    game.textures[i].name = tex_names[i];
+    game.textures[i].texture = texture;
+  }
+}
+
+SDL_Texture* get_texture(char* name) {
+  for (int i = 0; i < NUM_TEXTURES; i++) {
+    if (strcmp(game.textures[i].name, name) == 0) {
+      return game.textures[i].texture;
+    }
+  }
+  return NULL;
+}
+
+char* path_for_image(char* name) {
+  char* path = calloc(50, sizeof(char));
+  strcat(path, "./");
+  strcat(path, name);
+  strcat(path, ".bmp");
+  return path;
+}
+
+void draw_title_screen() {
+  SDL_Rect rect;
+  rect.x = 0;
+  rect.y = 0;
+  rect.w = SCREEN_WIDTH;
+  rect.h = SCREEN_HEIGHT;
+
+  SDL_RenderCopy(game.renderer, get_texture("title"), NULL, &rect);
+}
+
+void draw_paused() {
+  SDL_Rect rect;
+  rect.x = 0;
+  rect.y = 0;
+  rect.w = SCREEN_WIDTH;
+  rect.h = SCREEN_HEIGHT;
+
+  SDL_RenderCopy(game.renderer, get_texture("pause"), NULL, &rect);
+}
+
+void draw_game_over() {
+  SDL_Rect rect;
+  rect.x = 0;
+  rect.y = 0;
+  rect.w = SCREEN_WIDTH;
+  rect.h = SCREEN_HEIGHT;
+
+  SDL_RenderCopy(game.renderer, get_texture("game_over"), NULL, &rect);
 }
 
 #define WALL_COLOR 110, 150, 170, 255
@@ -138,7 +281,8 @@ void draw_walls() {
   SDL_RenderFillRect(game.renderer, &block);
 }
 
-#define SNAKE_SIZE sizeof(game.snake)/sizeof(game.snake[0])
+//#define SNAKE_SIZE sizeof(game.snake)/sizeof(game.snake[0])
+#define SNAKE_SIZE CELL_COUNT
 
 void spawn_snake(int start_x, int start_y) {
   for (int i = 0; i < SNAKE_SIZE; i++) {
@@ -221,6 +365,7 @@ void change_direction(SDL_KeyCode new_direction) {
 }
 
 void move_snake() {
+  // TODO: remove?
   if (game.game_over) {
     return;
   }
@@ -322,12 +467,21 @@ void display_score() {
   SDL_SetWindowTitle(game.window, buffer);
 }
 
+void check_game_over() {
+  if (game.game_over) {
+    game.state = GAME_OVER;
+  }
+}
+
 void terminate(int exit_code) {
   if (game.renderer) {
     SDL_DestroyRenderer(game.renderer);
   }
   if (game.window) {
     SDL_DestroyWindow(game.window);
+  }
+  for (int i = 0; i < NUM_TEXTURES; i ++) {
+    SDL_DestroyTexture(game.textures[i].texture);
   }
   SDL_Quit();
   exit(exit_code);
@@ -338,11 +492,37 @@ void handle_input() {
   while (SDL_PollEvent(&e)) {
     if (e.type == SDL_QUIT || (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE)) {
       game.running = 0;
-    } else if (e.type == SDL_KEYDOWN && (e.key.keysym.sym == SDLK_UP
-                                      || e.key.keysym.sym == SDLK_DOWN
-                                      || e.key.keysym.sym == SDLK_LEFT
-                                      || e.key.keysym.sym == SDLK_RIGHT)) {
-      change_direction(e.key.keysym.sym);
+      return;
+    }
+
+    switch (game.state) {
+      case TITLE_SCREEN:
+        if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_RETURN) {
+          start_game();
+        }
+        break;
+      case PLAYING:
+        if (e.type == SDL_KEYDOWN) {
+          if (e.key.keysym.sym == SDLK_UP
+           || e.key.keysym.sym == SDLK_DOWN
+           || e.key.keysym.sym == SDLK_LEFT
+           || e.key.keysym.sym == SDLK_RIGHT) {
+            change_direction(e.key.keysym.sym);
+          } else if (e.key.keysym.sym == SDLK_p) {
+            pause_game();
+          }
+        }
+        break;
+      case PAUSED:
+        if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_p) {
+          unpause_game();
+        }
+        break;
+      case GAME_OVER:
+        if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_RETURN) {
+          to_title_screen();
+        }
+        break;
     }
   }
 }

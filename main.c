@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <SDL.h>
+#include <SDL2/SDL_ttf.h>
 
 #define SCREEN_WIDTH 680
 #define SCREEN_HEIGHT 400
@@ -34,6 +35,7 @@ void spawn_food(void);
 void draw_food(void);
 
 void display_score(void);
+void draw_score(void);
 void check_game_over(void);
 
 void start_game(void);
@@ -71,6 +73,7 @@ typedef struct {
 void initialize_game_object(void);
 
 Game game;
+TTF_Font* font;
 
 void initialize_game_object() {
   if (game.snake) {
@@ -112,6 +115,7 @@ int main() {
         draw_walls();
         draw_food();
         draw_snake();
+        draw_score();
         check_game_over();
         break;
       case PAUSED:
@@ -119,12 +123,14 @@ int main() {
         draw_food();
         draw_snake();
         draw_paused();
+        draw_score();
         break;
       case GAME_OVER:
         draw_walls();
         draw_food();
         draw_snake();
         draw_game_over();
+        draw_score();
         break;
     }
     SDL_RenderPresent(game.renderer);
@@ -184,6 +190,15 @@ void initialize() {
   if (!game.renderer) {
     printf("error: failed to create renderer: %s\n", SDL_GetError());
     terminate(EXIT_FAILURE);
+  }
+
+  if (TTF_Init() < 0) {
+    printf("error: failed to initialize TTF: %s\n", SDL_GetError());
+  }
+
+  font = TTF_OpenFont("font.ttf", 18);
+  if (!font) {
+    printf("error: failed to load font: %s\n", SDL_GetError());
   }
 
   game.textures = malloc(NUM_TEXTURES * sizeof(Tex));
@@ -255,6 +270,31 @@ void draw_game_over() {
 
   SDL_RenderCopy(game.renderer, get_texture("game_over"), NULL, &rect);
 }
+
+void draw_score() {
+  SDL_Surface* score;
+  SDL_Color color = { 0, 0, 0 };
+
+  char* score_string = malloc(30);
+  snprintf(score_string, 30, "Score: %d", game.score);
+  score = TTF_RenderText_Solid(font, score_string, color);
+  if (!score) {
+    printf("Woup!\n");
+    // TODO
+    exit(1);
+  }
+
+  // TODO don't make a new texture every frame
+
+  SDL_Texture* score_texture;
+  score_texture = SDL_CreateTextureFromSurface(game.renderer, score);
+  SDL_Rect dest = { 0, 0, score->w, score->h };
+  SDL_RenderCopy(game.renderer, score_texture, NULL, &dest);
+
+  SDL_DestroyTexture(score_texture);
+  SDL_FreeSurface(score);
+}
+  
 
 #define WALL_COLOR 110, 150, 170, 255
 void draw_walls() {
@@ -434,12 +474,12 @@ void spawn_food() {
   // TODO: Figure out how to get rid of these checks
   if (game.food.x < WALL_THICKNESS) {
     game.food.x = WALL_THICKNESS;
-    puts("Does this happen for real?");
-  } // ?????????
+    //puts("Does this happen for real?");
+  } 
 
   if (game.food.y < WALL_THICKNESS) {
     game.food.y = WALL_THICKNESS;
-    puts("Does this happen for real?");
+    //puts("Does this happen for real?");
   }
 
   // printf("%d vs %d, %d vs %d\n", game.snake[4].x, game.food.x, game.snake[4].y, game.food.y);

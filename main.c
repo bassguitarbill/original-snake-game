@@ -30,6 +30,8 @@ void draw_food(void);
 
 void display_score(void);
 
+typedef enum dir {UP, DOWN, LEFT, RIGHT} dir;
+
 typedef struct {
   SDL_Renderer *renderer;
   SDL_Window *window;
@@ -37,6 +39,7 @@ typedef struct {
   SDL_Rect snake[CELL_COUNT];
   int dx;
   int dy;
+  dir last_move;
   int game_over;
   SDL_Rect food;
   int score;
@@ -52,6 +55,7 @@ Game game = {
     .w = CELL_WIDTH,
     .h = CELL_HEIGHT
   },
+  .last_move = RIGHT,
   .score = 0,
 };
 
@@ -188,11 +192,12 @@ void handle_collisions() {
   }
 }
 
+// TODO: Implement a move buffer for quick 180-degree turns
 void change_direction(SDL_KeyCode new_direction) {
-  int going_up = game.dy == -CELL_HEIGHT;
-  int going_down = game.dy == CELL_HEIGHT;
-  int going_left = game.dx == -CELL_WIDTH;
-  int going_right = game.dx == CELL_WIDTH;
+  int going_up = game.last_move == UP;
+  int going_down = game.last_move == DOWN;
+  int going_left = game.last_move == LEFT;
+  int going_right = game.last_move == RIGHT;
 
   if (new_direction == SDLK_UP && !going_down) {
     game.dx = 0;
@@ -223,6 +228,11 @@ void move_snake() {
   for (int i = SNAKE_SIZE-1; i >= 0; i--) {
     game.snake[i] = game.snake[i-1];
   }
+
+  if      (game.dx > 0) game.last_move = RIGHT;
+  else if (game.dx < 0) game.last_move = LEFT;
+  else if (game.dy < 0) game.last_move = UP;
+  else if (game.dy > 0) game.last_move = DOWN;
 
   game.snake[0].x = game.snake[1].x + game.dx;
   game.snake[0].y = game.snake[1].y + game.dy;
@@ -275,6 +285,8 @@ void spawn_food() {
   game.food.x = (rand() % (((SCREEN_WIDTH - CELL_WIDTH - WALL_THICKNESS) / CELL_WIDTH)+1)*CELL_WIDTH);
   game.food.y = (rand() % (((SCREEN_HEIGHT - CELL_HEIGHT - WALL_THICKNESS) / CELL_HEIGHT)+1)*CELL_HEIGHT);
 
+
+  // TODO: Figure out how to get rid of these checks
   if (game.food.x < WALL_THICKNESS) {
     game.food.x = WALL_THICKNESS;
     puts("Does this happen for real?");

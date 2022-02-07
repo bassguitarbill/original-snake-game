@@ -68,12 +68,15 @@ typedef struct {
   int score;
   game_state state;
   Tex *textures;
+  int score_dirty;
+  TTF_Font *font;
+  SDL_Texture *score_texture;
+  SDL_Rect score_size;
 } Game;
 
 void initialize_game_object(void);
 
 Game game;
-TTF_Font* font;
 
 void initialize_game_object() {
   if (game.snake) {
@@ -90,6 +93,7 @@ void initialize_game_object() {
   game.last_move = RIGHT;
   game.score = 0;
   game.state = TITLE_SCREEN;
+  game.score_dirty = 1;
 }
 
 int main() {
@@ -194,11 +198,13 @@ void initialize() {
 
   if (TTF_Init() < 0) {
     printf("error: failed to initialize TTF: %s\n", SDL_GetError());
+    terminate(EXIT_FAILURE);
   }
 
-  font = TTF_OpenFont("font.ttf", 18);
-  if (!font) {
+  game.font = TTF_OpenFont("font.ttf", 18);
+  if (!game.font) {
     printf("error: failed to load font: %s\n", SDL_GetError());
+    terminate(EXIT_FAILURE);
   }
 
   game.textures = malloc(NUM_TEXTURES * sizeof(Tex));
@@ -215,7 +221,7 @@ void initialize() {
     }
     texture = SDL_CreateTextureFromSurface(game.renderer, image);
     if (!texture) {
-      printf("error: failed to create title screen texture: %s\n", SDL_GetError());
+      printf("error: failed to create texture: %s\n", SDL_GetError());
       terminate(EXIT_FAILURE);
     }
     SDL_FreeSurface(image);
@@ -272,27 +278,27 @@ void draw_game_over() {
 }
 
 void draw_score() {
-  SDL_Surface* score;
-  SDL_Color color = { 0, 0, 0 };
+  if (game.score_dirty) {
+    SDL_Surface* score;
+    SDL_Color color = { 0, 0, 0 };
 
-  char* score_string = malloc(30);
-  snprintf(score_string, 30, "Score: %d", game.score);
-  score = TTF_RenderText_Solid(font, score_string, color);
-  if (!score) {
-    printf("Woup!\n");
-    // TODO
-    exit(1);
+    char* score_string = malloc(30);
+    snprintf(score_string, 30, "Score: %d", game.score);
+    score = TTF_RenderText_Solid(game.font, score_string, color);
+    if (!score) {
+      printf("error: failed to create score texture: %s\n", SDL_GetError());
+      // terminate(EXIT_FAILURE);
+    }
+
+    SDL_Rect dest = { 0, 0, score->w, score->h };
+    game.score_size = dest;
+    SDL_DestroyTexture(game.score_texture);
+    game.score_texture = SDL_CreateTextureFromSurface(game.renderer, score);
+    SDL_FreeSurface(score);
   }
 
-  // TODO don't make a new texture every frame
-
-  SDL_Texture* score_texture;
-  score_texture = SDL_CreateTextureFromSurface(game.renderer, score);
-  SDL_Rect dest = { 0, 0, score->w, score->h };
-  SDL_RenderCopy(game.renderer, score_texture, NULL, &dest);
-
-  SDL_DestroyTexture(score_texture);
-  SDL_FreeSurface(score);
+  SDL_RenderCopy(game.renderer, game.score_texture, NULL, &(game.score_size));
+  game.score_dirty = 0;
 }
   
 
@@ -427,7 +433,7 @@ void move_snake() {
   if (game.snake[0].x == game.food.x && game.snake[0].y == game.food.y) {
     spawn_food();
     game.score += 1;
-    display_score();
+    game.score_dirty = 1;
   } else {
     for (int i = 5; i < SNAKE_SIZE; i++) {
       if (game.snake[i].w == 0) {

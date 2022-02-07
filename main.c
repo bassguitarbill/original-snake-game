@@ -15,7 +15,7 @@
 #define SNAKE_START_X 200
 #define SNAKE_START_Y 200
 
-#define NUM_TEXTURES 3
+#define NUM_TEXTURES 4
 
 void initialize(void);
 void terminate(int exit_code);
@@ -208,7 +208,7 @@ void initialize() {
   }
 
   game.textures = malloc(NUM_TEXTURES * sizeof(Tex));
-  char* tex_names[] = {"title", "pause", "game_over"};
+  char* tex_names[] = {"title", "pause", "game_over", "hamburger"};
 
   SDL_Surface *image;
   SDL_Texture *texture;
@@ -501,10 +501,8 @@ void spawn_food() {
   }
 }
 
-#define FOOD_COLOR 50, 200, 20, 255
 void draw_food() {
-  SDL_SetRenderDrawColor(game.renderer, FOOD_COLOR);
-  SDL_RenderFillRect(game.renderer, &game.food);
+  SDL_RenderCopy(game.renderer, get_texture("hamburger"), NULL, &game.food);
 }
 
 void display_score() {

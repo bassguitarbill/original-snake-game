@@ -2,6 +2,8 @@
 #include <SDL.h>
 #include <SDL2/SDL_ttf.h>
 
+#include "input_buffer.c"
+
 #define SCREEN_WIDTH 680
 #define SCREEN_HEIGHT 400
 
@@ -28,6 +30,7 @@ void draw_game_over(void);
 void spawn_snake(int start_x, int start_y);
 void move_snake(void);
 void change_direction(SDL_KeyCode new_direction);
+void add_control_input_to_buffer(SDL_KeyCode new_direction);
 
 void handle_collisions(void);
 
@@ -72,6 +75,7 @@ typedef struct {
   TTF_Font *font;
   SDL_Texture *score_texture;
   SDL_Rect score_size;
+  input_buffer *input_buffer;
 } Game;
 
 void initialize_game_object(void);
@@ -169,6 +173,8 @@ void to_title_screen() {
 }
 
 void initialize() {
+  game.input_buffer = initialize_input_buffer();
+
   if (SDL_Init(SDL_INIT_VIDEO) < 0) {
     printf("error: failed to initialize SDL: %s\n", SDL_GetError());
     terminate(EXIT_FAILURE);
@@ -382,12 +388,24 @@ void handle_collisions() {
   }
 }
 
-// TODO: Implement a move buffer for quick 180-degree turns
+void add_control_input_to_buffer(SDL_KeyCode new_direction) {
+  push_to_input_buffer(game.input_buffer, new_direction);
+}
+
 void change_direction(SDL_KeyCode new_direction) {
-  int going_up = game.last_move == UP;
-  int going_down = game.last_move == DOWN;
-  int going_left = game.last_move == LEFT;
-  int going_right = game.last_move == RIGHT;
+  int going_up, going_down, going_left, going_right;
+  if (game.input_buffer->count > 0) {
+    SDL_KeyCode last_move = game.input_buffer->data[game.input_buffer->count - 1];
+    going_up = last_move == SDLK_UP;
+    going_down = last_move == SDLK_DOWN;
+    going_left = last_move == SDLK_LEFT;
+    going_right = last_move == SDLK_RIGHT;
+  } else {
+    going_up = game.last_move == UP;
+    going_down = game.last_move == DOWN;
+    going_left = game.last_move == LEFT;
+    going_right = game.last_move == RIGHT;
+  }
 
   if (new_direction == SDLK_UP && !going_down) {
     game.dx = 0;
@@ -410,15 +428,18 @@ void change_direction(SDL_KeyCode new_direction) {
   }
 }
 
-void move_snake() {
-  // TODO: remove?
-  if (game.game_over) {
-    return;
-  }
+void pop_movement() {
+  if (game.input_buffer->count == 0) return;
+  change_direction(pop_from_input_buffer(game.input_buffer));
+}
 
+
+void move_snake() {
   for (int i = SNAKE_SIZE-1; i >= 0; i--) {
     game.snake[i] = game.snake[i-1];
   }
+
+  pop_movement();
 
   if      (game.dx > 0) game.last_move = RIGHT;
   else if (game.dx < 0) game.last_move = LEFT;
@@ -551,7 +572,8 @@ void handle_input() {
            || e.key.keysym.sym == SDLK_DOWN
            || e.key.keysym.sym == SDLK_LEFT
            || e.key.keysym.sym == SDLK_RIGHT) {
-            change_direction(e.key.keysym.sym);
+            add_control_input_to_buffer(e.key.keysym.sym);
+            //change_direction(e.key.keysym.sym);
           } else if (e.key.keysym.sym == SDLK_p) {
             pause_game();
           }

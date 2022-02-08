@@ -1,3 +1,25 @@
+#ifndef GAME_H
+#define GAME_H
+
+#define SCREEN_WIDTH 680
+#define SCREEN_HEIGHT 400
+
+#define WALL_THICKNESS 20
+
+#define CELL_WIDTH 20
+#define CELL_HEIGHT 20
+
+#define WALL_COLOR 110, 150, 170, 255
+
+#define CELL_COUNT ((SCREEN_WIDTH - WALL_THICKNESS * 2) * \
+(SCREEN_HEIGHT - WALL_THICKNESS * 2))/\
+(CELL_WIDTH * CELL_HEIGHT)
+
+#define SNAKE_SIZE CELL_COUNT
+
+#define SNAKE_START_X 200
+#define SNAKE_START_Y 200
+
 typedef enum dir {UP, DOWN, LEFT, RIGHT} dir;
 
 typedef enum gamestate {TITLE_SCREEN, PLAYING, PAUSED, GAME_OVER} game_state;
@@ -40,3 +62,7 @@ typedef struct {
   wav_buffer *sfx;
   int audio_device_id;
 } Game;
+
+void terminate(Game *game, int exit_code);
+
+#endif

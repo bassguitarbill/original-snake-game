@@ -5,32 +5,13 @@
 
 #include "game.h"
 
+
 #include "input_buffer.c"
+#include "gfx.c"
 #include "sfx.c"
 
-#define SCREEN_WIDTH 680
-#define SCREEN_HEIGHT 400
-
-#define WALL_THICKNESS 20
-
-#define CELL_WIDTH 20
-#define CELL_HEIGHT 20
-#define CELL_COUNT ((SCREEN_WIDTH - WALL_THICKNESS * 2) * \
-                    (SCREEN_HEIGHT - WALL_THICKNESS * 2))/\
-                    (CELL_WIDTH * CELL_HEIGHT)
-#define SNAKE_START_X 200
-#define SNAKE_START_Y 200
-
-#define NUM_TEXTURES 4
-
 void initialize(void);
-void terminate(int exit_code);
 void handle_input(void);
-void draw_walls(void);
-void draw_snake(void);
-void draw_title_screen(void);
-void draw_paused(void);
-void draw_game_over(void);
 void spawn_snake(int start_x, int start_y);
 void move_snake(void);
 void change_direction(SDL_KeyCode new_direction);
@@ -39,19 +20,13 @@ void add_control_input_to_buffer(SDL_KeyCode new_direction);
 void handle_collisions(void);
 
 void spawn_food(void);
-void draw_food(void);
 
-void display_score(void);
-void draw_score(void);
 void check_game_over(void);
 
 void start_game(void);
 void pause_game(void);
 void unpause_game(void);
 void to_title_screen(void);
-
-SDL_Texture* get_texture(char* name);
-char* path_for_image(char* name);
 
 void initialize_game_object(void);
 
@@ -90,30 +65,30 @@ int main() {
 
     switch (game.state) {
       case TITLE_SCREEN:
-        draw_walls();
-        draw_title_screen();
+        draw_walls(&game);
+        draw_title_screen(&game);
         break;
       case PLAYING:
         move_snake();
-        draw_walls();
-        draw_food();
-        draw_snake();
-        draw_score();
+        draw_walls(&game);
+        draw_food(&game);
+        draw_snake(&game);
+        draw_score(&game);
         check_game_over();
         break;
       case PAUSED:
-        draw_walls();
-        draw_food();
-        draw_snake();
-        draw_paused();
-        draw_score();
+        draw_walls(&game);
+        draw_food(&game);
+        draw_snake(&game);
+        draw_paused(&game);
+        draw_score(&game);
         break;
       case GAME_OVER:
-        draw_walls();
-        draw_food();
-        draw_snake();
-        draw_game_over();
-        draw_score();
+        draw_walls(&game);
+        draw_food(&game);
+        draw_snake(&game);
+        draw_game_over(&game);
+        draw_score(&game);
         break;
     }
     SDL_RenderPresent(game.renderer);
@@ -121,7 +96,7 @@ int main() {
     SDL_Delay(100);
   }
 
-  terminate(EXIT_SUCCESS);
+  terminate(&game, EXIT_SUCCESS);
 }
 
 void start_game() {
@@ -141,7 +116,6 @@ void unpause_game() {
 
 void to_title_screen() {
   initialize_game_object();
-  display_score();
   spawn_snake(SNAKE_START_X, SNAKE_START_Y);
   game.state = TITLE_SCREEN;
   return;
@@ -150,169 +124,9 @@ void to_title_screen() {
 void initialize() {
   game.input_buffer = initialize_input_buffer();
 
-  if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-    printf("error: failed to initialize SDL: %s\n", SDL_GetError());
-    terminate(EXIT_FAILURE);
-  }
-
-  game.window = SDL_CreateWindow(
-      "Score: 0",
-      SDL_WINDOWPOS_UNDEFINED,
-      SDL_WINDOWPOS_UNDEFINED,
-      SCREEN_WIDTH,
-      SCREEN_HEIGHT,
-      SDL_WINDOW_SHOWN
-  );
-
-  if (!game.window) {
-    printf("error: failed to open a %d by %d window: %s\n", SCREEN_WIDTH, SCREEN_HEIGHT, SDL_GetError());
-    terminate(EXIT_FAILURE);
-  }
-
-  SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
-  game.renderer = SDL_CreateRenderer(game.window, -1, SDL_RENDERER_ACCELERATED);
-
-  if (!game.renderer) {
-    printf("error: failed to create renderer: %s\n", SDL_GetError());
-    terminate(EXIT_FAILURE);
-  }
-
-  if (TTF_Init() < 0) {
-    printf("error: failed to initialize TTF: %s\n", SDL_GetError());
-    terminate(EXIT_FAILURE);
-  }
-
-  game.font = TTF_OpenFont("font.ttf", 18);
-  if (!game.font) {
-    printf("error: failed to load font: %s\n", SDL_GetError());
-    terminate(EXIT_FAILURE);
-  }
-
-  game.textures = malloc(NUM_TEXTURES * sizeof(Tex));
-  char* tex_names[] = {"title", "pause", "game_over", "hamburger"};
-
-  SDL_Surface *image;
-  SDL_Texture *texture;
-
-  for (int i = 0; i < NUM_TEXTURES; i ++) {
-    image = SDL_LoadBMP(path_for_image(tex_names[i]));
-    if (!image) {
-      printf("error: failed to load image '%s': %s\n", tex_names[i], SDL_GetError());
-      terminate(EXIT_FAILURE);
-    }
-    texture = SDL_CreateTextureFromSurface(game.renderer, image);
-    if (!texture) {
-      printf("error: failed to create texture: %s\n", SDL_GetError());
-      terminate(EXIT_FAILURE);
-    }
-    SDL_FreeSurface(image);
-    game.textures[i].name = tex_names[i];
-    game.textures[i].texture = texture;
-  }
-
+  initialize_gfx(&game);
   initialize_sfx(&game);
 }
-
-
-SDL_Texture* get_texture(char* name) {
-  for (int i = 0; i < NUM_TEXTURES; i++) {
-    if (strcmp(game.textures[i].name, name) == 0) {
-      return game.textures[i].texture;
-    }
-  }
-  return NULL;
-}
-
-char* path_for_image(char* name) {
-  char* path = calloc(50, sizeof(char));
-  strcat(path, "./");
-  strcat(path, name);
-  strcat(path, ".bmp");
-  return path;
-}
-
-void draw_title_screen() {
-  SDL_Rect rect;
-  rect.x = 0;
-  rect.y = 0;
-  rect.w = SCREEN_WIDTH;
-  rect.h = SCREEN_HEIGHT;
-
-  SDL_RenderCopy(game.renderer, get_texture("title"), NULL, &rect);
-}
-
-void draw_paused() {
-  SDL_Rect rect;
-  rect.x = 0;
-  rect.y = 0;
-  rect.w = SCREEN_WIDTH;
-  rect.h = SCREEN_HEIGHT;
-
-  SDL_RenderCopy(game.renderer, get_texture("pause"), NULL, &rect);
-}
-
-void draw_game_over() {
-  SDL_Rect rect;
-  rect.x = 0;
-  rect.y = 0;
-  rect.w = SCREEN_WIDTH;
-  rect.h = SCREEN_HEIGHT;
-
-  SDL_RenderCopy(game.renderer, get_texture("game_over"), NULL, &rect);
-}
-
-void draw_score() {
-  if (game.score_dirty) {
-    SDL_Surface* score;
-    SDL_Color color = { 0, 0, 0 };
-
-    char* score_string = malloc(30);
-    snprintf(score_string, 30, "Score: %d", game.score);
-    score = TTF_RenderText_Solid(game.font, score_string, color);
-    if (!score) {
-      printf("error: failed to create score texture: %s\n", SDL_GetError());
-      // terminate(EXIT_FAILURE);
-    }
-
-    SDL_Rect dest = { 0, 0, score->w, score->h };
-    game.score_size = dest;
-    SDL_DestroyTexture(game.score_texture);
-    game.score_texture = SDL_CreateTextureFromSurface(game.renderer, score);
-    SDL_FreeSurface(score);
-  }
-
-  SDL_RenderCopy(game.renderer, game.score_texture, NULL, &(game.score_size));
-  game.score_dirty = 0;
-}
-  
-
-#define WALL_COLOR 110, 150, 170, 255
-void draw_walls() {
-  SDL_SetRenderDrawColor(game.renderer, WALL_COLOR);
-
-  SDL_Rect block = {
-    .x = 0,
-    .y = 0,
-    .w = WALL_THICKNESS,
-    .h = SCREEN_HEIGHT
-  };
-
-  SDL_RenderFillRect(game.renderer, &block);
-
-  block.x = SCREEN_WIDTH - WALL_THICKNESS;
-  SDL_RenderFillRect(game.renderer, &block);
-
-  block.x = 0;
-  block.w = SCREEN_WIDTH;
-  block.h = WALL_THICKNESS;
-  SDL_RenderFillRect(game.renderer, &block);
-
-  block.y = SCREEN_HEIGHT - WALL_THICKNESS;
-  SDL_RenderFillRect(game.renderer, &block);
-}
-
-//#define SNAKE_SIZE sizeof(game.snake)/sizeof(game.snake[0])
-#define SNAKE_SIZE CELL_COUNT
 
 void spawn_snake(int start_x, int start_y) {
   for (int i = 0; i < SNAKE_SIZE; i++) {
@@ -448,30 +262,6 @@ void move_snake() {
   handle_collisions();
 }
 
-#define SNAKE_COLOR 200, 188, 178, 255
-#define DEAD_SNAKE_COLOR 210, 40, 30, 255
-void draw_snake(void) {
-  SDL_SetRenderDrawColor(game.renderer, game.game_over ? DEAD_SNAKE_COLOR : SNAKE_COLOR);
-  SDL_RenderFillRect(game.renderer, &game.snake[0]);
-
-  for (int i = 1; i < SNAKE_SIZE; i++) {
-    if (game.snake[i].w == 0) {
-      break;
-    }
-
-    if (game.game_over) {
-      SDL_SetRenderDrawColor(game.renderer, DEAD_SNAKE_COLOR);
-    } else {
-      SDL_SetRenderDrawColor(game.renderer, SNAKE_COLOR);
-    }
-
-    SDL_RenderFillRect(game.renderer, &game.snake[i]);
-
-    SDL_SetRenderDrawColor(game.renderer, 0, 0, 0, 255);
-    SDL_RenderDrawRect(game.renderer, &game.snake[i]);
-  }
-}
-
 void spawn_food() {
   game.food.x = (rand() % (((SCREEN_WIDTH - CELL_WIDTH - WALL_THICKNESS) / CELL_WIDTH)+1)*CELL_WIDTH);
   game.food.y = (rand() % (((SCREEN_HEIGHT - CELL_HEIGHT - WALL_THICKNESS) / CELL_HEIGHT)+1)*CELL_HEIGHT);
@@ -501,16 +291,6 @@ void spawn_food() {
   }
 }
 
-void draw_food() {
-  SDL_RenderCopy(game.renderer, get_texture("hamburger"), NULL, &game.food);
-}
-
-void display_score() {
-  char buffer[20];
-  snprintf(buffer, 20, "Score: %d", game.score);
-  SDL_SetWindowTitle(game.window, buffer);
-}
-
 void check_game_over() {
   if (game.game_over) {
     game.state = GAME_OVER;
@@ -518,15 +298,15 @@ void check_game_over() {
   }
 }
 
-void terminate(int exit_code) {
-  if (game.renderer) {
-    SDL_DestroyRenderer(game.renderer);
+void terminate(Game *game, int exit_code) {
+  if (game->renderer) {
+    SDL_DestroyRenderer(game->renderer);
   }
-  if (game.window) {
-    SDL_DestroyWindow(game.window);
+  if (game->window) {
+    SDL_DestroyWindow(game->window);
   }
   for (int i = 0; i < NUM_TEXTURES; i ++) {
-    SDL_DestroyTexture(game.textures[i].texture);
+    SDL_DestroyTexture(game->textures[i].texture);
   }
   SDL_Quit();
   exit(exit_code);

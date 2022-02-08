@@ -3,7 +3,10 @@
 #include <string.h>
 #include <SDL2/SDL_ttf.h>
 
+#include "game.h"
+
 #include "input_buffer.c"
+#include "sfx.c"
 
 #define SCREEN_WIDTH 680
 #define SCREEN_HEIGHT 400
@@ -19,7 +22,6 @@
 #define SNAKE_START_Y 200
 
 #define NUM_TEXTURES 4
-#define NUM_SFX 2
 
 void initialize(void);
 void terminate(int exit_code);
@@ -50,43 +52,6 @@ void to_title_screen(void);
 
 SDL_Texture* get_texture(char* name);
 char* path_for_image(char* name);
-
-typedef enum dir {UP, DOWN, LEFT, RIGHT} dir;
-
-typedef enum gamestate {TITLE_SCREEN, PLAYING, PAUSED, GAME_OVER} game_state;
-
-typedef struct wav_buffer {
-  Uint32 length;
-  Uint8 *buffer;
-  char* name;
-} wav_buffer;
-
-typedef struct {
-  char* name;
-  SDL_Texture *texture;
-} Tex;
-
-typedef struct {
-  SDL_Renderer *renderer;
-  SDL_Window *window;
-  int running;
-  SDL_Rect *snake;
-  int dx;
-  int dy;
-  dir last_move;
-  int game_over;
-  SDL_Rect food;
-  int score;
-  game_state state;
-  Tex *textures;
-  int score_dirty;
-  TTF_Font *font;
-  SDL_Texture *score_texture;
-  SDL_Rect score_size;
-  input_buffer *input_buffer;
-  wav_buffer *sfx;
-  int audio_device_id;
-} Game;
 
 void initialize_game_object(void);
 
@@ -245,28 +210,7 @@ void initialize() {
     game.textures[i].texture = texture;
   }
 
-    
-  SDL_Init(SDL_INIT_AUDIO);
-
-  game.sfx = malloc(NUM_SFX * sizeof(wav_buffer));
-  char* sfx_names[] = { "chomp.wav", "die.wav" };
-  SDL_AudioSpec wav_spec;
-  for (int i = 0; i < NUM_SFX; i++) {
-    SDL_LoadWAV(sfx_names[i], &wav_spec, &game.sfx[i].buffer, &game.sfx[i].length);
-    game.sfx[i].name = sfx_names[i];
-  }
-
-  game.audio_device_id = SDL_OpenAudioDevice(NULL, 0, &wav_spec, NULL, 0);
-}
-
-void play_sound(char* file) {
-  for (int i = 0; i < NUM_SFX; i++) {
-    if (strcmp(file, game.sfx[i].name) == 0) {
-      SDL_QueueAudio(game.audio_device_id, game.sfx[i].buffer, game.sfx[i].length);
-      SDL_PauseAudioDevice(game.audio_device_id, 0);
-      return;
-    }
-  }
+  initialize_sfx(&game);
 }
 
 
@@ -489,7 +433,7 @@ void move_snake() {
     spawn_food();
     game.score += 1;
     game.score_dirty = 1;
-    play_sound("chomp.wav");
+    play_sound(&game, "chomp.wav");
   } else {
     for (int i = 5; i < SNAKE_SIZE; i++) {
       if (game.snake[i].w == 0) {
@@ -570,7 +514,7 @@ void display_score() {
 void check_game_over() {
   if (game.game_over) {
     game.state = GAME_OVER;
-    play_sound("die.wav");
+    play_sound(&game, "die.wav");
   }
 }
 
